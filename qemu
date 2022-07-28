@@ -11,13 +11,15 @@ function help() {
         "   -h  Print help information"
         ""
         "SUBCOMMANDS:"
+        "   backup      Backup an existing virtual machine"
         "   clone       Clone an existing virtual machine"
         "   help        Print this message or the help of the given subcommand(s)"
         "   install     Create and install a new virtual machine"
         "   list        Print the names of all installed virtual machines"
         "   remove      Uninstall a virtual machine"
-        "   run         Start up a virtual machine"
+        "   restore     Restore a virtual machine from an existing backup"
         "   shutdown    Terminate a running virtual machine"
+        "   start       Start up a virtual machine"
     )
 
     if [[ $# -gt 1 ]]; then
@@ -27,8 +29,8 @@ function help() {
             help_install $@
             exit 0
             ;;
-        "run")
-            help_run $@
+        "start")
+            help_start $@
             exit 0
             ;;
         "shutdown")
@@ -45,6 +47,14 @@ function help() {
             ;;
         "remove")
             help_remove $@
+            exit 0
+            ;;
+        "backup")
+            help_backup $@
+            exit 0
+            ;;
+        "restore")
+            help_restore $@
             exit 0
             ;;
         *)
@@ -74,10 +84,10 @@ function help_install() {
     printf "%s\n" "${message[@]}"
 }
 
-function help_run() {
+function help_start() {
     message=(
         "USAGE:"
-        "   qemu run [OPTIONS] -n <NAME>"
+        "   qemu start [OPTIONS] -n <NAME>"
         ""
         "OPTIONS:"
         "   -c  Cores for virtual machine [default: 2]"
@@ -137,12 +147,36 @@ function help_remove() {
     printf "%s\n" "${message[@]}"
 }
 
+function help_backup() {
+    message=(
+        "USAGE:"
+        "   qemu backup [OPTIONS] -n <NAME>"
+        ""
+        "OPTIONS:"
+        "   -h  Print help information"
+        "   -n  Name of virtual machine to backup"
+    )
+    printf "%s\n" "${message[@]}"
+}
+
+function help_restore() {
+    message=(
+        "USAGE:"
+        "   qemu restore [OPTIONS] -n <NAME>"
+        ""
+        "OPTIONS:"
+        "   -h  Print help information"
+        "   -n  Name of backed up virtual machine to restore"
+    )
+    printf "%s\n" "${message[@]}"
+}
+
 function install() {
     name=""
     iso=""
     cores=2
     memory=2
-    size=32
+    size=256
 
     while getopts "n:i:c:m:s:h" opt; do
         case $opt in
@@ -198,7 +232,7 @@ function install() {
         -cdrom $iso
 }
 
-function run() {
+function start() {
     name=""
     cores=2
     memory=2
@@ -219,19 +253,19 @@ function run() {
             port=$OPTARG
             ;;
         h)
-            help_run $@
+            help_start $@
             exit 0
             ;;
         *)
             echo "qemu: unknown option: $opt"
-            help_run $@
+            help_start $@
             exit 1
             ;;
         esac
     done
 
     if [[ -z $name ]]; then
-        echo "qemu: missing name of virtual machine to run"
+        echo "qemu: missing name of virtual machine to start"
         exit 1
     fi
 
@@ -376,6 +410,70 @@ function remove() {
     echo "done."
 }
 
+function backup() {
+    name=""
+    backup_name=""
+
+    while getopts "n:h" opt; do
+        case $opt in
+        n)
+            name=$CONFIG_DIR/$OPTARG.qcow2
+            backup_name=$CONFIG_DIR/$OPTARG.bak.qcow2
+            ;;
+        h)
+            help_backup $@
+            exit 0
+            ;;
+        *)
+            echo "qemu: unknown option: $opt"
+            help_backup $@
+            exit 1
+            ;;
+        esac
+    done
+
+    if [[ -z $name ]]; then
+        echo "qemu: missing name of virtual machine to backup"
+        exit 1
+    fi
+
+    echo -n "qemu: backing up virtual machine... "
+    cp $name $backup_name
+    echo "done."
+}
+
+function restore() {
+    name=""
+    backup_name=""
+
+    while getopts "n:h" opt; do
+        case $opt in
+        n)
+            name=$CONFIG_DIR/$OPTARG.qcow2
+            backup_name=$CONFIG_DIR/$OPTARG.bak.qcow2
+            ;;
+        h)
+            help_restore $@
+            exit 0
+            ;;
+        *)
+            echo "qemu: unknown option: $opt"
+            help_restore $@
+            exit 1
+            ;;
+        esac
+    done
+
+    if [[ -z $name ]]; then
+        echo "qemu: missing name of virtual machine to backup"
+        exit 1
+    fi
+
+    echo -n "qemu: restoring virtual machine... "
+    cp $backup_name $name
+    echo "done."
+}
+
 if [[ ! -d $CONFIG_DIR ]]; then
     echo -n "qemu: missing config directory, creating... "
     mkdir -p $CONFIG_DIR
@@ -392,9 +490,9 @@ case $subcommand in
     shift
     install $@
     ;;
-"run")
+"start")
     shift
-    run $@
+    start $@
     ;;
 "shutdown")
     shift
@@ -411,6 +509,14 @@ case $subcommand in
 "remove")
     shift
     remove $@
+    ;;
+"backup")
+    shift
+    backup $@
+    ;;
+"restore")
+    shift
+    restore $@
     ;;
 *)
     echo "qemu: unknown subcommand: $subcommand"
