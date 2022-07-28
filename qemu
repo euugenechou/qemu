@@ -5,7 +5,7 @@ CONFIG_DIR="$HOME/.config/qemu"
 function help() {
     message=(
         "USAGE:"
-        "   $0 <SUBCOMMAND>"
+        "   qemu <SUBCOMMAND>"
         ""
         "OPTIONS:"
         "   -h  Print help information"
@@ -61,7 +61,7 @@ function help() {
 function help_install() {
     message=(
         "USAGE:"
-        "   $0 install [OPTIONS] -n <NAME> -i <ISO>"
+        "   qemu install [OPTIONS] -n <NAME> -i <ISO>"
         ""
         "OPTIONS:"
         "   -c  Cores for virtual machine [default: 2]"
@@ -77,7 +77,7 @@ function help_install() {
 function help_run() {
     message=(
         "USAGE:"
-        "   $0 run [OPTIONS] -n <NAME>"
+        "   qemu run [OPTIONS] -n <NAME>"
         ""
         "OPTIONS:"
         "   -c  Cores for virtual machine [default: 2]"
@@ -92,7 +92,7 @@ function help_run() {
 function help_shutdown() {
     message=(
         "USAGE:"
-        "   $0 shutdown [OPTIONS] -n <NAME>"
+        "   qemu shutdown [OPTIONS] -n <NAME>"
         ""
         "OPTIONS:"
         "   -h  Print help information"
@@ -104,7 +104,7 @@ function help_shutdown() {
 function help_clone() {
     message=(
         "USAGE:"
-        "   $0 clone [OPTIONS] -s <NAME> -d <NAME>"
+        "   qemu clone [OPTIONS] -s <NAME> -d <NAME>"
         ""
         "OPTIONS:"
         "   -h  Print help information"
@@ -117,7 +117,7 @@ function help_clone() {
 function help_list() {
     message=(
         "USAGE:"
-        "   $0 list [OPTIONS]"
+        "   qemu list [OPTIONS]"
         ""
         "OPTIONS:"
         "   -h  Print help information"
@@ -128,7 +128,7 @@ function help_list() {
 function help_remove() {
     message=(
         "USAGE:"
-        "   $0 list [OPTIONS] -n <NAME>"
+        "   qemu list [OPTIONS] -n <NAME>"
         ""
         "OPTIONS:"
         "   -h  Print help information"
