@@ -13,6 +13,7 @@ function help() {
         "SUBCOMMANDS:"
         "   backup      Backup an existing virtual machine"
         "   clone       Clone an existing virtual machine"
+        "   disk        Create a new disk"
         "   help        Print this message or the help of the given subcommand(s)"
         "   install     Create and install a new virtual machine"
         "   list        Print the names of all installed virtual machines"
@@ -57,6 +58,10 @@ function help() {
             help_restore $@
             exit 0
             ;;
+        "disk")
+            help_disk $@
+            exit 0
+            ;;
         *)
             echo "qemu: unknown subcommand: $subcommand"
             printf "%s\n" "${message[@]}"
@@ -77,9 +82,9 @@ function help_install() {
         "   -c  Cores for virtual machine [default: 2]"
         "   -h  Print help information"
         "   -i  ISO to install on virtual machine"
-        "   -m  Memory (gigabytes) for virtual machine [default: 2]"
+        "   -m  Memory (gigabytes) for virtual machine [default: 4]"
         "   -n  Name of virtual machine"
-        "   -s  Disk size (gigabytes) for virtual machine in [default: 32]"
+        "   -s  Disk size (gigabytes) for virtual machine in [default: 256]"
     )
     printf "%s\n" "${message[@]}"
 }
@@ -91,8 +96,9 @@ function help_start() {
         ""
         "OPTIONS:"
         "   -c  Cores for virtual machine [default: 2]"
+        "   -d  Name of optional disk to attach"
         "   -h  Print help information"
-        "   -m  Memory (gigabytes) for virtual machine [default: 2]"
+        "   -m  Memory (gigabytes) for virtual machine [default: 4]"
         "   -n  Name of virtual machine"
         "   -p  Port to forward to [default: 8080]"
     )
@@ -171,11 +177,24 @@ function help_restore() {
     printf "%s\n" "${message[@]}"
 }
 
+function help_disk() {
+    message=(
+        "USAGE:"
+        "   qemu disk [OPTIONS] -n <NAME>"
+        ""
+        "OPTIONS:"
+        "   -h  Print help information"
+        "   -n  Name of disk to create"
+        "   -s  Size of disk [default: 128G]"
+    )
+    printf "%s\n" "${message[@]}"
+}
+
 function install() {
     name=""
     iso=""
-    cores=2
-    memory=2
+    cores=4
+    memory=4
     size=256
 
     while getopts "n:i:c:m:s:h" opt; do
@@ -220,7 +239,7 @@ function install() {
     qemu-img create -f qcow2 $name ${size}G
 
     qemu-system-aarch64 \
-        -M virt,highmem=off \
+        -M virt,highmem=on \
         -accel hvf \
         -cpu host \
         -smp $cores \
@@ -234,14 +253,15 @@ function install() {
 
 function start() {
     name=""
-    cores=2
-    memory=2
+    cores=4
+    memory=4
     port=8080
+    disk=""
 
-    while getopts "n:c:m:p:h" opt; do
+    while getopts "n:c:m:p:d:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
+            name=$CONFIG_DIR/machines/$OPTARG.qcow2
             ;;
         c)
             cores=$OPTARG
@@ -251,6 +271,9 @@ function start() {
             ;;
         p)
             port=$OPTARG
+            ;;
+        d)
+            disk=$CONFIG_DIR/disks/$OPTARG.qcow2
             ;;
         h)
             help_start $@
@@ -269,18 +292,34 @@ function start() {
         exit 1
     fi
 
-    qemu-system-aarch64 \
-        -M virt,highmem=off \
-        -accel hvf \
-        -cpu host \
-        -smp $cores \
-        -m ${memory}G \
-        -bios $CONFIG_DIR/efi.fd \
-        -device virtio-gpu-pci \
-        -nographic \
-        -net user,hostfwd=tcp::$port-:22 \
-        -net nic \
-        -drive file=$name,if=virtio,cache=writethrough
+    if [[ -z $disk ]]; then
+        qemu-system-aarch64 \
+            -M virt,highmem=on \
+            -accel hvf \
+            -cpu host \
+            -smp $cores \
+            -m ${memory}G \
+            -bios $CONFIG_DIR/efi.fd \
+            -device virtio-gpu-pci \
+            -nographic \
+            -net user,hostfwd=tcp::$port-:22 \
+            -net nic \
+            -drive file=$name,if=virtio,cache=writethrough
+    else
+        qemu-system-aarch64 \
+            -M virt,highmem=on \
+            -accel hvf \
+            -cpu host \
+            -smp $cores \
+            -m ${memory}G \
+            -bios $CONFIG_DIR/efi.fd \
+            -device virtio-gpu-pci \
+            -nographic \
+            -net user,hostfwd=tcp::$port-:22 \
+            -net nic \
+            -drive file=$name,if=virtio,cache=writethrough \
+            -drive file=$disk,format=qcow2,media=disk
+    fi
 }
 
 function shutdown() {
@@ -289,7 +328,7 @@ function shutdown() {
     while getopts "n:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
+            name=$OPTARG
             ;;
         h)
             help_shutdown $@
@@ -321,11 +360,11 @@ function clone() {
         case $opt in
         s)
             src_name=$OPTARG
-            src=$CONFIG_DIR/$OPTARG.qcow2
+            src=$CONFIG_DIR/machines/$OPTARG.qcow2
             ;;
         d)
             dst_name=$OPTARG
-            dst=$CONFIG_DIR/$OPTARG.qcow2
+            dst=$CONFIG_DIR/machines/$OPTARG.qcow2
             ;;
         h)
             help_clone $@
@@ -369,7 +408,7 @@ function list() {
         esac
     done
 
-    for vm in $CONFIG_DIR/*.qcow2; do
+    for vm in $CONFIG_DIR/machines/*.qcow2; do
         name=$(basename $vm)
         echo ${name%.*}
     done
@@ -381,7 +420,7 @@ function remove() {
     while getopts "n:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
+            name=$CONFIG_DIR/machines/$OPTARG.qcow2
             ;;
         h)
             help_remove $@
@@ -417,8 +456,8 @@ function backup() {
     while getopts "n:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
-            backup_name=$CONFIG_DIR/$OPTARG.bak.qcow2
+            name=$CONFIG_DIR/machines/$OPTARG.qcow2
+            backup_name=$CONFIG_DIR/machines/$OPTARG.bak.qcow2
             ;;
         h)
             help_backup $@
@@ -449,8 +488,8 @@ function restore() {
     while getopts "n:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
-            backup_name=$CONFIG_DIR/$OPTARG.bak.qcow2
+            name=$CONFIG_DIR/machines/$OPTARG.qcow2
+            backup_name=$CONFIG_DIR/machines/$OPTARG.bak.qcow2
             ;;
         h)
             help_restore $@
@@ -474,11 +513,56 @@ function restore() {
     echo "done."
 }
 
+function disk() {
+    name=""
+    size=128
+
+    while getopts "n:s:h" opt; do
+        case $opt in
+        n)
+            name=$CONFIG_DIR/disks/$OPTARG.qcow2
+            ;;
+        s)
+            size=$OPTARG
+            ;;
+        h)
+            help_disk $@
+            exit 0
+            ;;
+        *)
+            echo "qemu: unknown option: $opt"
+            help_disk $@
+            exit 1
+            ;;
+        esac
+    done
+
+    if [[ -z $name ]]; then
+        echo "qemu: missing name of disk to create"
+        exit 1
+    fi
+
+    echo -n "qemu: creating disk... "
+    qemu-img create -f qcow2 $name ${size}G &> /dev/null
+    echo "done."
+}
+
 if [[ ! -d $CONFIG_DIR ]]; then
     echo -n "qemu: missing config directory, creating... "
     mkdir -p $CONFIG_DIR
     echo "done."
-    exit 0
+fi
+
+if [[ ! -d "$CONFIG_DIR/machines" ]]; then
+    echo -n "qemu: missing virtual machine directory, creating... "
+    mkdir -p "$CONFIG_DIR/machines"
+    echo "done."
+fi
+
+if [[ ! -d "$CONFIG_DIR/disks" ]]; then
+    echo -n "qemu: missing disk directory, creating... "
+    mkdir -p "$CONFIG_DIR/disks"
+    echo "done."
 fi
 
 subcommand=$1
@@ -517,6 +601,10 @@ case $subcommand in
 "restore")
     shift
     restore $@
+    ;;
+"disk")
+    shift
+    disk $@
     ;;
 *)
     echo "qemu: unknown subcommand: $subcommand"
