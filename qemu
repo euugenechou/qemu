@@ -82,7 +82,7 @@ function help_install() {
         "   -c  Cores for virtual machine [default: 2]"
         "   -h  Print help information"
         "   -i  ISO to install on virtual machine"
-        "   -m  Memory (gigabytes) for virtual machine [default: 4]"
+        "   -m  Memory (gigabytes) for virtual machine [default: 8]"
         "   -n  Name of virtual machine"
         "   -s  Disk size (gigabytes) for virtual machine in [default: 256]"
     )
@@ -98,7 +98,7 @@ function help_start() {
         "   -c  Cores for virtual machine [default: 2]"
         "   -d  Name of optional disk to attach"
         "   -h  Print help information"
-        "   -m  Memory (gigabytes) for virtual machine [default: 4]"
+        "   -m  Memory (gigabytes) for virtual machine [default: 8]"
         "   -n  Name of virtual machine"
         "   -p  Port to forward to [default: 8080]"
     )
@@ -194,13 +194,14 @@ function install() {
     name=""
     iso=""
     cores=4
-    memory=4
+    memory=8
     size=256
+    uefi="$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd"
 
     while getopts "n:i:c:m:s:h" opt; do
         case $opt in
         n)
-            name=$CONFIG_DIR/$OPTARG.qcow2
+            name=$CONFIG_DIR/machines/$OPTARG.qcow2
             ;;
         i)
             iso=$OPTARG
@@ -244,19 +245,21 @@ function install() {
         -cpu host \
         -smp $cores \
         -m ${memory}G \
-        -bios $CONFIG_DIR/efi.fd \
+        -bios $uefi \
+        -drive file=$name,if=none,cache=writethrough,id=hd0 \
         -device virtio-gpu-pci \
+        -device virtio-blk-device,drive=hd0 \
         -nographic \
-        -drive file=$name,if=virtio,cache=writethrough \
         -cdrom $iso
 }
 
 function start() {
     name=""
     cores=4
-    memory=4
+    memory=8
     port=8080
     disk=""
+    uefi="$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd"
 
     while getopts "n:c:m:p:d:h" opt; do
         case $opt in
@@ -299,12 +302,14 @@ function start() {
             -cpu host \
             -smp $cores \
             -m ${memory}G \
-            -bios $CONFIG_DIR/efi.fd \
+            -bios $uefi \
+            -drive file=$name,if=none,cache=writethrough,id=hd0 \
             -device virtio-gpu-pci \
+            -device virtio-blk-device,drive=hd0 \
             -nographic \
             -net user,hostfwd=tcp::$port-:22 \
-            -net nic \
-            -drive file=$name,if=virtio,cache=writethrough
+            -net nic
+            # -net user,hostfwd=tcp::$port-:22,hostfwd=tcp::9797-:80,hostfwd=tcp::9898-:9000 \
     else
         qemu-system-aarch64 \
             -M virt,highmem=on \
@@ -312,13 +317,15 @@ function start() {
             -cpu host \
             -smp $cores \
             -m ${memory}G \
-            -bios $CONFIG_DIR/efi.fd \
+            -bios $uefi \
+            -drive file=$name,if=none,cache=writethrough \
             -device virtio-gpu-pci \
+            -device virtio-blk-device,drive=hd0 \
+            -drive file=$disk,format=qcow2,media=disk \
             -nographic \
             -net user,hostfwd=tcp::$port-:22 \
-            -net nic \
-            -drive file=$name,if=virtio,cache=writethrough \
-            -drive file=$disk,format=qcow2,media=disk
+            -net nic
+            # -net user,hostfwd=tcp::$port-:22,hostfwd=tcp::9797-:80,hostfwd=tcp::9898-:9000 \
     fi
 }
 
